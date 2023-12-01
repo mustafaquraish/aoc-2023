@@ -135,6 +135,7 @@ if __name__ == "__main__":
     parser.add_argument("--force", "-f", action='store_true', help="Force overwrite existing files")
 
     args = parser.parse_args()
+    os.makedirs("input", exist_ok=True)
 
     get_input_file(args)
     get_sample_file(args)
