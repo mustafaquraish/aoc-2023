@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+
 import contextlib
 import os
 import os
 import re
 import requests
+import shutil
 
 from pathlib import Path
 from glob import glob
@@ -67,33 +70,39 @@ def cmd(c):
     if os.system(c) != 0:
         raise Exception(f"Command failed: {c}")
 
-def run_day(dir):
-    day = os.path.basename(d)
+def run_ocen(file):
+    day = re.search(r"(\d+)", file).group(1)
     inp = get_input(day).strip()+"\n"
     expected = get_expected(day)
 
-    print(f"[+] Checking {d} ... ", end="", flush=True)
-    with pushd(d):
-        with open("in.txt", "w") as fp:
-            fp.write(inp)
-        cmd("ocen main.oc > /dev/null")
-        cmd("./out in.txt > out.txt")
-        with open("out.txt") as fp:
-            nums = [int(line.split()[-1]) for line in fp]
-        cmd("rm out.txt")
+    inf = f"./build/{day}.in"
+    outf = f"./build/{day}.out"
+    exef = f"./build/{day}"
+
+    print(f"[+] Checking {file} ... ", end="", flush=True)
+    with open(inf, "w") as fp:
+        fp.write(inp)
+    cmd(f"ocen {file} -o {exef} > /dev/null")
+    cmd(f"{exef} {inf} > {outf}")
+    with open(outf) as fp:
+        nums = [int(line.split()[-1]) for line in fp]
     if nums != expected:
         raise Exception(f"Day {day}: Expected {expected}, got {nums}")
 
 
+os.makedirs("build", exist_ok=True)
+
 fail = False
-for d in glob("??"):
-    if not os.path.isdir(d): continue
+for d in glob("src/*.oc"):
+    if not os.path.isfile(d): continue
     try:
-        run_day(d)
+        run_ocen(d)
         print("PASS")
     except Exception as e:
         print(f"FAIL: {e}")
         fail = True
+
+shutil.rmtree("build")
 
 if fail:
     exit(1)

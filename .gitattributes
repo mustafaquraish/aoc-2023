@@ -1,0 +1,2 @@
+*.oc linguist-language=Rust
+bootstrap/*.c binary -text -diff
