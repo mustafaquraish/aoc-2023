@@ -1,4 +1,4 @@
-import @sv::{ SV }
+import std::sv::{ SV }
 // import std::libc::*
 // import std::vec::{ Vec }
 // import std::map::{ Map }
