@@ -19,7 +19,7 @@ fi
 set -e
 
 if [ $SRC -nt $OUT ]; then
-    ocen $SRC -o $OUT
+    ocen -d $SRC -o $OUT
 fi
 
 set -x
