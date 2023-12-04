@@ -6,6 +6,8 @@ import os
 import re
 import requests
 import shutil
+import argparse
+from time import perf_counter
 
 from pathlib import Path
 from glob import glob
@@ -40,6 +42,10 @@ def get_session():
     print("No session key found anywhere.")
     os.exit(1)
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--time", "-t", action="store_true")
+args = parser.parse_args()
+
 session = requests.Session()
 session.cookies.set("session", get_session(), domain=".adventofcode.com")
 
@@ -70,6 +76,8 @@ def cmd(c):
     if os.system(c) != 0:
         raise Exception(f"Command failed: {c}")
 
+commands = []
+
 def run_ocen(file):
     day = re.search(r"(\d+)", file).group(1)
     inp = get_input(day).strip()+"\n"
@@ -83,7 +91,10 @@ def run_ocen(file):
     with open(inf, "w") as fp:
         fp.write(inp)
     cmd(f"ocen {file} -o {exef} > /dev/null")
+
     cmd(f"{exef} {inf} > {outf}")
+    commands.append(f"{exef} {inf} > /dev/null")
+
     with open(outf) as fp:
         nums = [int(line.split()[-1]) for line in fp]
     if nums != expected:
@@ -102,7 +113,12 @@ for d in sorted(glob("src/??.oc")):
         print(f"FAIL: {e}")
         fail = True
 
-shutil.rmtree("build")
+if args.time:
+    run_cmd = "\n".join(commands)
+    time_cmd = f'time bash -c "{run_cmd}"'
+    print()
+    print("Timing execution for all days...")
+    cmd(time_cmd)
 
 if fail:
     exit(1)

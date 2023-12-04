@@ -18,17 +18,14 @@ jobs:
           repository: ocen-lang/ocen
           path: ocen
 
-      - name: Build aecor
+      - name: Build ocen
         run: |
           cd ocen
           ./meta/bootstrap.sh
           echo "OCEN_ROOT=${{ github.workspace }}/ocen" >> $GITHUB_ENV
           echo "${{ github.workspace }}/ocen/bootstrap" >> $GITHUB_PATH
-        
-      - name: Install Requests
-        run: pip install requests
 
       - name: Test all examples
         env:
           AOC_SESSION: ${{ secrets.AOC_SESSION }}
-        run: python3 ./meta/check_all.py
+        run: python3 ./meta/check_all.py -t
