@@ -1,0 +1,26 @@
+import std::vector::{ Vector }
+import std::sv::{ SV }
+
+
+struct Grid {
+    lines: &Vector<str>
+    width: u32
+    height: u32
+}
+
+def Grid::make(sv: SV): Grid {
+    let lines = Vector<str>::new()
+    let width = 0
+    for line : sv.lines() {
+        lines.push(line.data)
+        width = line.len
+    }
+    let height = lines.size
+    return Grid(lines, width, height)
+}
+
+def Grid::at(&this, x: u32, y: u32): char => .lines.at(y)[x]
+
+def Grid::free(&this) {
+    .lines.free()
+}

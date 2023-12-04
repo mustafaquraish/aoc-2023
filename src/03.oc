@@ -2,41 +2,19 @@ import std::sv::{ SV }
 import std::map::{ Map }
 import std::set::{ Set }
 import std::vector::{ Vector }
+import .common::*
 
-struct Grid {
-    lines: &str
-    width: u32
-    height: u32
-}
 
-def Grid::make(sv: SV): Grid {
-    let line = sv.chop_line()
-    let height = line.len
-    let width = line.len
-    let buf = std::new<str>(height)
-    buf[0] = line.data
-    for let i = 1; i < height; i++ {
-        buf[i] = sv.chop_line().data
-    }
-    return Grid(buf, width, height)
-}
-
-def Grid::free(&this) {
-    std::libc::free(.lines)
-}
-
-def Grid::at(&this, x: u32, y: u32): char => .lines[y][x]
-
-def Grid::find_symbol_around(&this, x: u32, y: u32, sym: str = null): i32 {
+def find_symbol_around(grid: Grid, x: u32, y: u32, sym: str = null): i32 {
     for let dx = -1; dx <= 1; dx++ {
         for let dy = -1; dy <= 1; dy++ {
             if dx == 0 and dy == 0 then continue
 
             let nx = x as i32 + dx
             let ny = y as i32 + dy
-            if 0i32 <= nx < .width as i32 and 0i32 <= ny < .height as i32 {
-                let c = .at(nx as u32, ny as u32)
-                let idx = .width as i32 * ny + nx
+            if 0i32 <= nx < grid.width as i32 and 0i32 <= ny < grid.height as i32 {
+                let c = grid.at(nx as u32, ny as u32)
+                let idx = grid.width as i32 * ny + nx
 
                 if sym == null {
                     if not c.is_digit() and c != '.' {
@@ -66,7 +44,7 @@ def part_one(sv: SV): i64 {
             let c = grid.at(x, y)
             if x < grid.width and c.is_digit() {
                 cur_num = cur_num * 10 + (c as u32 - '0' as u32)
-                if grid.find_symbol_around(x, y) >= 0 {
+                if find_symbol_around(grid, x, y) >= 0 {
                     cur_has_symbol = true
                 }
             } else {
@@ -95,7 +73,7 @@ def part_two(sv: SV): i64 {
             let c = grid.at(x, y)
             if x < grid.width and c.is_digit() {
                 cur_num = cur_num * 10 + (c as u32 - '0' as u32)
-                let gear = grid.find_symbol_around(x, y, "*")
+                let gear = find_symbol_around(grid, x, y, "*")
                 if gear >= 0 {
                     cur_gears.add(gear as u32)
                 }

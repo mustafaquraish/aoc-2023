@@ -93,7 +93,7 @@ def run_ocen(file):
 os.makedirs("build", exist_ok=True)
 
 fail = False
-for d in glob("src/*.oc"):
+for d in sorted(glob("src/??.oc")):
     if not os.path.isfile(d): continue
     try:
         run_ocen(d)
