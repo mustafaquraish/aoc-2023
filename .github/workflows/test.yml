@@ -1,0 +1,34 @@
+# Build Workflow
+name: build
+
+# Run on Push
+on: [push]
+
+
+jobs:
+  build:
+    # Run this on a default linux machine
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Checkout ocen repo
+        uses: actions/checkout@v3
+        with:
+          repository: ocen-lang/ocen
+          path: ocen
+
+      - name: Build aecor
+        run: |
+          cd ocen
+          ./meta/bootstrap.sh
+          echo "OCEN_ROOT=${{ github.workspace }}/ocen" >> $GITHUB_ENV
+          echo "${{ github.workspace }}/ocen/bootstrap" >> $GITHUB_PATH
+        
+      - name: Install Requests
+        run: pip install requests
+
+      - name: Test all examples
+        env:
+          AOC_SESSION: ${{ secrets.AOC_SESSION }}
+        run: python3 ./meta/check_all.py

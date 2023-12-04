@@ -1,10 +1,9 @@
 # ignore everything
 *
 
-!.git*
-
-# but don't ignore files ending with slash = directories
 !*/
+!.git*
+!**/*.yml
 
 !meta/*
 !**/*.oc
