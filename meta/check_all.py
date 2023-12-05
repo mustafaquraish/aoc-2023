@@ -40,7 +40,7 @@ def get_session():
                 return fp.read().strip()
 
     print("No session key found anywhere.")
-    os.exit(1)
+    exit(1)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--time", "-t", action="store_true")
@@ -90,7 +90,7 @@ def run_ocen(file):
     print(f"[+] Checking {file} ... ", end="", flush=True)
     with open(inf, "w") as fp:
         fp.write(inp)
-    cmd(f"ocen {file} -o {exef} > /dev/null")
+    cmd(f"ocen {file} -o {exef} -cf '-O3 -march=native -funroll-loops'  > /dev/null")
 
     cmd(f"{exef} {inf} > {outf}")
     commands.append(f"{exef} {inf} > /dev/null")
@@ -116,9 +116,19 @@ for d in sorted(glob("src/??.oc")):
 if args.time:
     run_cmd = "\n".join(commands)
     time_cmd = f'time bash -c "{run_cmd}"'
+
+    path = "build/run.sh"
+    with open(path, "w") as fp:
+        fp.write("#!/usr/bin/env bash\n")
+        fp.write(time_cmd)
+
+    mode = os.stat(path).st_mode
+    mode |= (mode & 0o444) >> 2    # copy R bits to X
+    os.chmod(path, mode)
+
     print()
     print("Timing execution for all days...")
-    cmd(time_cmd)
+    cmd(f"./build/run.sh")
 
 if fail:
     exit(1)

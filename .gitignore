@@ -5,5 +5,7 @@
 !.git*
 !**/*.yml
 
+build
+
 !meta/*
 !**/*.oc

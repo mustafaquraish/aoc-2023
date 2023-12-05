@@ -18,9 +18,7 @@ fi
 
 set -e
 
-if [ $SRC -nt $OUT ]; then
-    ocen -d $SRC -o $OUT
-fi
+ocen -d $SRC -o $OUT
 
 set -x
 

@@ -1,0 +1,130 @@
+import std::sv::{ SV }
+import std::vector::{ Vector }
+
+struct Range {
+    start: u64
+    end: u64
+}
+
+struct Mapping {
+    src: Range
+    dst: Range
+}
+
+struct Input {
+    nums: &Vector<u64>
+    steps: &Vector<&Vector<Mapping>>
+}
+
+def parse(sv: SV): Input {
+    let nums = Vector<u64>::new()
+    let steps = Vector<&Vector<Mapping>>::new()
+
+    let first = sv.chop_line()
+    sv.chop_line()
+
+    for num : first.iter_nums() {
+        nums.push(num)
+    }
+
+    for step : sv.split_str("\n\n") {
+        step.chop_line()
+        let mappings = Vector<Mapping>::new()
+        for mapping : step.lines() {
+            let dst_start = mapping.chop_u64()
+            let src_start = mapping.chop_u64()
+            let len = mapping.chop_u64()
+
+            mappings.push(Mapping(
+                Range(src_start, src_start + len),
+                Range(dst_start, dst_start + len)
+            ))
+        }
+        steps.push(mappings)
+    }
+
+    return Input(nums, steps)
+}
+
+def part_one(inp: Input): u64 {
+    let lowest = (-1) as u64
+    for num : inp.nums.iter() {
+        for step : inp.steps.iter() {
+            for mp : step.iter() {
+                if mp.src.start <= num < mp.src.end {
+                    num = mp.dst.start + (num - mp.src.start)
+                    break
+                }
+            }
+        }
+        lowest = lowest.min(num)
+    }
+    return lowest
+}
+
+def part_two(inp: Input): u64 {
+    let cur_ranges = Vector<Range>::new()
+    let next_ranges = Vector<Range>::new()
+
+    for let i = 0; i < inp.nums.size; i += 2 {
+        let start = inp.nums.at(i)
+        let len = inp.nums.at(i + 1)
+        cur_ranges.push(Range(start, start + len))
+    }
+
+    let lowest = (-1) as u64
+
+    for step : inp.steps.iter() {
+        for let i = 0; i < cur_ranges.size; i++ {
+            let cur = cur_ranges.at(i)
+
+            for mp : step.iter() {
+                // Range is completely outside, go on
+                if cur.end <= mp.src.start or cur.start >= mp.src.end continue
+
+                // Range is outside on the left, split it
+                if cur.start < mp.src.start {
+                    let left = Range(cur.start, mp.src.start)
+                    cur_ranges.push(left)
+                    cur = Range(mp.src.start, cur.end)
+                }
+
+                // Range is outside on the right, split it
+                if cur.end > mp.src.end {
+                    let right = Range(mp.src.end, cur.end)
+                    cur_ranges.push(right)
+                    cur = Range(cur.start, mp.src.end)
+                }
+
+                // Range is completely inside, remap it, and we're done
+                if cur.start >= mp.src.start and cur.end <= mp.src.end {
+                    cur = Range(
+                        mp.dst.start + (cur.start - mp.src.start),
+                        mp.dst.start + (cur.end - mp.src.start)
+                    )
+                    break
+                }
+            }
+            next_ranges.push(cur)
+        }
+        cur_ranges.clear()
+
+        // Swap `ranges` and `next_ranges``
+        let tmp = cur_ranges
+        cur_ranges = next_ranges
+        next_ranges = tmp
+    }
+
+    for range : cur_ranges.iter() {
+        lowest = lowest.min(range.start)
+    }
+    return lowest
+}
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    let sv = SV::from_file(argv[1])
+    let inp = parse(sv)
+    println(`Part 1: {part_one(inp)}`)
+    println(`Part 2: {part_two(inp)}`)
+}
