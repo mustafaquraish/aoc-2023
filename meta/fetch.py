@@ -91,7 +91,7 @@ def get_input_file(args):
     if body.status_code != 200:
         print(f"Could not download {input_url}.")
         print(body)
-        return
+        exit(1)
 
     print(f"Saving {path}...")
     with path.open("w") as fp:

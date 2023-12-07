@@ -5,19 +5,16 @@ import std::sv::{ SV }
 // import std::vector::{ Vector }
 // import std::image::{ Image }
 
-
-def part_one(sv: SV): i64 {
-    let total = 0i64
+def part_one(sv: SV): u64 {
+    let total = 0u64
     for line : sv.lines() {
-        line.print("line")
     }
     return total
 }
 
-def part_two(sv: SV): i64 {
-    let total = 0i64
+def part_two(sv: SV): u64 {
+    let total = 0u64
     for line : sv.lines() {
-        line.print("line")
     }
     return total
 }
