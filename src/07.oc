@@ -1,0 +1,102 @@
+import std::sv::{ SV }
+import std::vector::{ Vector }
+import std::sort::sort
+
+struct Hand {
+    cards: SV
+    bet: u64
+    type: u32
+}
+
+def parse_input(sv: SV): &Vector<Hand> {
+    let hands = Vector<Hand>::new()
+    for line : sv.lines() {
+        let cards = line.chop_word()
+        let bet = line.chop_u64()
+        hands.push(Hand(cards, bet, 0))  // type is set later
+    }
+    return hands
+}
+
+def get_card_ranking(c: char, jokers: bool = false): u64 => match c {
+    'T' => 10
+    'J' => if jokers then 0 else 11
+    'Q' => 12
+    'K' => 13
+    'A' => 14
+    else => c.get_digit() as u64
+}
+
+def get_hand_type(hand: SV, jokers: bool): u32 {
+    let vs: [u64; 15]
+    let num_jokers = 0u64
+    for let i = 0; i < hand.len; i++ {
+        let c = hand.at(i)
+        if c == 'J' and jokers {
+            num_jokers += 1
+        } else {
+            let v = get_card_ranking(hand.at(i))
+            vs[v] += 1
+        }
+    }
+
+    sort<u64>(vs, 15)
+    if jokers {
+        vs[14] += num_jokers
+    }
+    return match vs[14] {
+        5 => 1           // 5 of a kind
+        4 => 2           // 4 of a kind
+        3 => match vs[13] {
+            2 => 3       // full house
+            else => 4    // 3 of a kind
+        }
+        2 => match vs[13] {
+            2 => 5       // 2 pair
+            else => 6    // 1 pair
+        }
+        else => 7        // high card
+    }
+}
+
+def Hand::compare_helper(this, other: Hand, jokers: bool): i8 {
+    // NOTE: -1 here means this card is HIGHER ranked than the other card
+    if .type != other.type return .type.compare(other.type)
+    for let i = 0; i < .cards.len; i++ {
+        if .cards.at(i) != other.cards.at(i) {
+            let a = get_card_ranking(.cards.at(i), jokers)
+            let b = get_card_ranking(other.cards.at(i), jokers)
+            return b.compare(a)  // reverse order
+        }
+    }
+    return 0
+}
+
+def Hand::compare(this, other: Hand): i8 => .compare_helper(other, jokers: false)
+def Hand::compare_jokers(this, other: Hand): i8 => .compare_helper(other, jokers: true)
+
+def solve(hands: &Vector<Hand>, jokers: bool): u64 {
+    for let i = 0; i < hands.size; i++ {
+        hands.data[i].type = get_hand_type(hands.data[i].cards, jokers)
+    }
+
+    sort<Hand>(hands.data, hands.size, if jokers then Hand::compare_jokers else Hand::compare)
+
+    let total = 0u64
+    for let i = 0; i < hands.size; i++ {
+        total += hands.at(i).bet * (hands.size - i) as u64
+    }
+    return total
+}
+
+def part_one(hands: &Vector<Hand>): u64 => solve(hands, jokers: false)
+def part_two(hands: &Vector<Hand>): u64 => solve(hands, jokers: true)
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    let sv = SV::from_file(argv[1])
+    let hands = parse_input(sv)
+    println(`Part 1: {part_one(hands)}`)
+    println(`Part 2: {part_two(hands)}`)
+    hands.free()
+}
