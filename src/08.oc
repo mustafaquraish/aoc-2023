@@ -1,0 +1,74 @@
+import std::sv::{ SV }
+import std::map::{ Map }
+import std::vector::{ Vector }
+import .common::{ lcm }
+
+struct Node {
+    name: SV,
+    l: SV,
+    r: SV,
+}
+
+def Node::step(&this, op: char): SV => if op == 'L' then .l else .r
+
+struct Input {
+    nodes: &Map<SV, Node>
+    ops: SV,
+}
+
+def Input::free(&this) {
+    this.nodes.free()
+}
+
+def parse(sv: SV): Input {
+    let ops = sv.chop_by_str("\n\n")
+
+    let nodes = Map<SV, Node>::new()
+    for line : sv.lines() {
+        let name = line.chop_by_str(" = (")
+        let l = line.chop_by_str(", ")
+        let r = line.chop_by_str(")")
+        nodes.insert(name, Node(name, l, r))
+    }
+
+    return Input(nodes, ops)
+}
+
+def part_one(inp: Input): u64 {
+    let steps = 0u64
+    let cur = inp.nodes.at(SV::from_str("AAA"))
+    while not cur.name.eq_str("ZZZ") {
+        for op : inp.ops.chars() {
+            cur = inp.nodes.at(cur.step(op))
+            steps += 1
+        }
+    }
+    return steps
+}
+
+def part_two(inp: Input): u64 {
+    let total = 1u64
+    for cur : inp.nodes.iter_values() {
+        if not cur.name.ends_with_str("A") continue
+
+        let steps = 0u64
+        while not cur.name.ends_with_str("Z") {
+            for op : inp.ops.chars() {
+                cur = inp.nodes.at(cur.step(op))
+                steps += 1
+            }
+        }
+        total = lcm(total, steps)
+    }
+    return total
+}
+
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    let sv = SV::from_file(argv[1])
+    let inp = parse(sv)
+    println(`Part 1: {part_one(inp)}`)
+    println(`Part 2: {part_two(inp)}`)
+    inp.free()
+}

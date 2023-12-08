@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DAY=$(printf "%02d" $1)
+DAY=$(printf "%02d" "${1#0}")
 shift
 
 mkdir -p build
