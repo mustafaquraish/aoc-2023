@@ -1,0 +1,44 @@
+import std::sv::{ SV }
+import std::vector::{ Vector }
+
+def compute(v: &Vector<i64>, front: bool): i64 {
+    let all_z = true
+    for n : v.iter() {
+        all_z = all_z and n == 0
+    }
+    if all_z return 0
+
+    let diffs = Vector<i64>::new()
+
+    for let i = 0; i < v.size - 1; i++ {
+        diffs.push(v.at(i + 1) - v.at(i))
+    }
+
+    let res = compute(diffs, front)
+    diffs.free()
+    if front {
+        return v.at(0) - res
+    } else {
+        return v.back() + res
+    }
+}
+
+def solve(sv: SV, front: bool): i64 {
+    let total = 0i64
+    for line : sv.lines() {
+        let v = Vector<i64>::new()
+        for n : line.iter_nums() {
+            v.push(n as i64)
+        }
+        total += compute(v, front)
+        v.free()
+    }
+    return total
+}
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    let sv = SV::from_file(argv[1])
+    println(`Part 1: {solve(sv, false)}`)
+    println(`Part 2: {solve(sv, true)}`)
+}
