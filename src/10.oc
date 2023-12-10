@@ -50,6 +50,33 @@ def Graph::free(&this) {
     .nodes.free()
 }
 
+def Graph::draw(&this, cycle: &Set<&Node>) {
+    for let y = 0; y < .height; y++ {
+        for let x = 0; x < .width; x++ {
+            let node = .get(x, y)
+            let disp = match node.c {
+                '|' => "│"
+                '-' => "─"
+                'J' => "┘"
+                'L' => "└"
+                'F' => "┌"
+                '7' => "┐"
+                '.' => " "
+                'S' => "S"
+                else => "?"
+            }
+            let on_cycle = cycle.contains(node)
+            if on_cycle {
+                print(`\x1b[31m{disp}\x1b[0m`)
+            } else {
+                // print in light grey
+                print(`\x1b[90m{disp}\x1b[0m`)
+            }
+        }
+        println("")
+    }
+}
+
 def Graph::get(&this, x: u32, y: u32): &Node {
     if 0 <= x < .width and 0 <= y < .height {
         return .nodes.at(y * .width + x)
@@ -163,6 +190,8 @@ def solve(g: Graph) {
             break
         }
     }
+
+    g.draw(cycle)
 
     println(`Part 1: {cycle.size() / 2}`)
 

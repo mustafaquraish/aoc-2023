@@ -96,7 +96,7 @@ def run_ocen(file):
     commands.append(f"{exef} {inf} > /dev/null")
 
     with open(outf) as fp:
-        nums = [int(line.split()[-1]) for line in fp]
+        nums = [int(x) for x in re.findall(r"Part .* (\d+)", fp.read())]
     if nums != expected:
         raise Exception(f"Day {day}: Expected {expected}, got {nums}")
 
