@@ -1,11 +1,30 @@
 import std::vector::{ Vector }
 import std::sv::{ SV }
 
+struct Point {
+    x: u64
+    y: u64
+}
+
+def Point::hash(&this): u32 => std::traits::hash::pair_hash(.x.hash(), .y.hash())
+def Point::eq(this, other: Point): bool => .x == other.x and .y == other.y
 
 struct Grid {
     lines: &Vector<str>
     width: u32
     height: u32
+}
+
+def Grid::empty(width: u32, height: u32, c: char = '.'): Grid {
+    let lines = Vector<str>::new()
+    for let i =  0; i < height; i++ {
+        let s = std::new<char>(width + 1)
+        for let j = 0; j < width; j++ {
+            s[j] = c
+        }
+        lines.push(s)
+    }
+    return Grid(lines, width, height)
 }
 
 def Grid::make(sv: SV): Grid {
@@ -20,9 +39,27 @@ def Grid::make(sv: SV): Grid {
 }
 
 def Grid::at(&this, x: u32, y: u32): char => .lines.at(y)[x]
+def Grid::at_point(&this, p: Point): char => .at(p.x as u32, p.y as u32)
+
+def Grid::set(&this, x: u32, y: u32, c: char) {
+    .lines.at(y)[x] = c
+}
+def Grid::set_point(&this, p: Point, c: char) {
+    .set(p.x as u32, p.y as u32, c)
+}
 
 def Grid::free(&this) {
     .lines.free()
+}
+
+def Grid::print(&this) {
+    for let i = 0; i < .height; i++ {
+        for let j = 0; j < .width; j++ {
+            let c = .at(j, i)
+            print(`{c}`)
+        }
+        println("")
+    }
 }
 
 def gcd(a: u64, b: u64): u64 => if b == 0 then a else gcd(b, a % b)
