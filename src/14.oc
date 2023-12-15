@@ -1,0 +1,133 @@
+import std::sv::{ SV }
+import std::buffer::{ Buffer }
+import std::map::{ Map }
+import .common::{ Grid, Point }
+
+enum Direction { N, W, S, E }
+
+def get_point(grid: &Grid, _x: u32, _y: u32, dir: Direction): Point {
+    let N = (grid.width - 1) as u64
+    let x = _x as u64
+    let y = _y as u64
+    return match dir {
+        N => Point(x, y),
+        W => Point(y, N - x),
+        S => Point(N - x, N - y),
+        E => Point(N - y, x),
+    }
+}
+
+def get_load(grid: &Grid): u64 {
+    let total = 0u64
+    for let row = 0; row < grid.height; row++ {
+        for let col = 0; col < grid.width; col++ {
+            let c = grid.at(col, row)
+            if c == 'O' {
+                total += grid.height as u64 - row as u64
+            }
+        }
+    }
+    return total
+}
+
+def roll_grid(grid: &Grid, dir: Direction) {
+    let N = grid.width
+
+    let total = 0u64
+    for let col = 0; col < N; col++ {
+        let pos = 0
+        for let row = 0; row < N; row++ {
+            let p = get_point(grid, col, row, dir)
+            let c = grid.at_point(p)
+
+            match c {
+                '#' => pos = row + 1
+                '.' => {}
+                'O' => {
+                    grid.set_point(p, '.')
+                    let new_point = get_point(grid, col, pos, dir)
+                    grid.set_point(new_point, 'O')
+                    pos++
+                }
+                else => assert false, `Unknown character {c}`
+            }
+        }   
+    }
+}
+
+def cycle(grid: &Grid) {
+    roll_grid(grid, N)
+    roll_grid(grid, W)
+    roll_grid(grid, S)
+    roll_grid(grid, E)
+}
+
+def part_one(sv: SV): u64 {
+    let grid = Grid::make(sv)
+    assert grid.width == grid.height, `Grid must be square`
+
+    roll_grid(&grid, N)
+    let load = get_load(&grid)
+
+    // Cleanup
+    grid.free()
+
+    return load
+}
+
+def grid_to_string(grid: &Grid): SV {
+    let buf = Buffer::make()
+    for let row = 0; row < grid.height; row++ {
+        for let col = 0; col < grid.width; col++ {
+            buf.putc(grid.at(col, row))
+        }
+        buf.putc('|')
+    }
+    return buf.sv()
+}
+
+def part_two(sv: SV): u64 {
+    let grid = Grid::make(sv)
+
+    let diff = 0u64
+    let count = 0u64
+
+    let seen = Map<SV, u64>::new()
+    while true {
+        let s = grid_to_string(&grid)
+        let prev = seen.get_item(s)
+        if prev? {
+            diff = count - prev.value
+            break
+        }
+        seen.insert(s, count)
+
+        cycle(&grid)
+        count += 1
+    }
+
+    let target = 1000000000u64
+    let rem = (target - count) % diff
+
+    for let i = 0u64; i < rem; i++ {
+        cycle(&grid)
+    }
+
+    let load = get_load(&grid)
+
+    // Cleanup
+    for it : seen.iter() {
+        std::libc::free(it.key.data)
+    }
+    seen.free()
+    grid.free()
+
+    return load
+}
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    let sv = SV::from_file(argv[1])
+    println(`Part 1: {part_one(sv)}`)
+    println(`Part 2: {part_two(sv)}`)
+}

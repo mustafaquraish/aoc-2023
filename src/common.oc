@@ -32,7 +32,9 @@ def Grid::make(sv: SV): Grid {
     let lines = Vector<str>::new()
     let width = 0
     for line : sv.lines() {
-        lines.push(line.data)
+        let mem = std::new<char>(line.len + 1)
+        std::libc::memcpy(mem, line.data, line.len)
+        lines.push(mem)
         width = line.len
     }
     let height = lines.size
@@ -50,6 +52,9 @@ def Grid::set_point(&this, p: Point, c: char) {
 }
 
 def Grid::free(&this) {
+    for let i = 0; i < .height; i++ {
+        std::libc::free(.lines.at(i))
+    }
     .lines.free()
 }
 
