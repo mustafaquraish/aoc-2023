@@ -1,0 +1,62 @@
+import std::sv::{ SV }
+import .common::{ Grid }
+
+enum Axis { X, Y }
+
+def is_mirrored(grid: Grid, axis: Axis, t: u32, smudges: u32): bool {
+    let axis_max = if axis == X then grid.width else grid.height
+    let other_max = if axis == X then grid.height else grid.width
+    
+    let before = t
+    let after = axis_max - t
+    let C = before.min(after)
+
+    let diff = 0
+    for let i = 0; i < C; i++ {
+        let a0 = t - i - 1
+        let a1 = t + i
+        for let j = 0; j < other_max; j++ {
+            let p0 = if axis == X then grid.at(a0, j) else grid.at(j, a0)
+            let p1 = if axis == X then grid.at(a1, j) else grid.at(j, a1)
+            if p0 != p1 {
+                if ++diff > smudges {
+                    return false
+                }
+            }
+        }
+    }
+    return diff == smudges
+}
+
+def get_score(grid: Grid, axis: Axis, t: u32, smudges: u32): u64 {
+    if not is_mirrored(grid, axis, t, smudges) return 0
+    let score = t as u64
+    if axis == Y {
+        score *= 100
+    }
+    return score
+}
+
+def solve(sv: SV) {
+    let part_one = 0u64
+    let part_two = 0u64
+    for line : sv.split_str("\n\n") {
+        let grid = Grid::make(line)
+        for let i = 1; i < grid.height; i++ {
+            part_one += get_score(grid, Y, i, smudges: 0)
+            part_two += get_score(grid, Y, i, smudges: 1)
+        }
+        for let i = 1; i < grid.width; i++ {
+            part_one += get_score(grid, X, i, smudges: 0)
+            part_two += get_score(grid, X, i, smudges: 1)
+        }
+        grid.free()
+    }
+    println(`Part 1: {part_one}`)
+    println(`Part 2: {part_two}`)
+}
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    solve(SV::from_file(argv[1]))
+}

@@ -1,12 +1,13 @@
 import std::vector::{ Vector }
 import std::sv::{ SV }
+import std::traits::hash::{ pair_hash }
 
 struct Point {
     x: u64
     y: u64
 }
 
-def Point::hash(&this): u32 => std::traits::hash::pair_hash(.x.hash(), .y.hash())
+def Point::hash(&this): u32 => pair_hash(.x.hash(), .y.hash())
 def Point::eq(this, other: Point): bool => .x == other.x and .y == other.y
 
 struct Grid {
