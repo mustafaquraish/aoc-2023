@@ -80,7 +80,7 @@ commands = []
 
 def run_ocen(file):
     day = re.search(r"(\d+)", file).group(1)
-    inp = get_input(day).strip()+"\n"
+    inp = get_input(day).strip()
     expected = get_expected(day)
 
     inf = f"./build/{day}.in"

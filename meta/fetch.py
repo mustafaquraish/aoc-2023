@@ -95,7 +95,7 @@ def get_input_file(args):
 
     print(f"Saving {path}...")
     with path.open("w") as fp:
-        fp.write(body.content.decode("utf-8").strip())
+        fp.write(body.content.decode("utf-8").rstrip())
 
 def get_sample_file(args):
     if (path := get_from_format(args, SAMPLE_INPUT_FORMAT)) is None:
