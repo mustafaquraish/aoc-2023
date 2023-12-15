@@ -25,7 +25,12 @@ jobs:
           echo "OCEN_ROOT=${{ github.workspace }}/ocen" >> $GITHUB_ENV
           echo "${{ github.workspace }}/ocen/bootstrap" >> $GITHUB_PATH
 
-      - name: Test all examples
+      - name: Test all days
         env:
           AOC_SESSION: ${{ secrets.AOC_SESSION }}
-        run: python3 ./meta/check_all.py -t
+        run: python3 ./meta/check_all.py
+
+      - name: Benchmark all days
+        env:
+          AOC_SESSION: ${{ secrets.AOC_SESSION }}
+        run: python3 ./meta/bench.py

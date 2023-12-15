@@ -16,29 +16,19 @@
 #      - ~/aoc/session
 #      - ~/.config/aoc/session
 #
-# To change where the output files are stored, you can tweak the two strings
-# below, which will be used to generate the paths. [[DAY]] and [[YEAR]] year will
-# be replaced with the current day and year, respectively (as entered through the
-# CLI).
-#
 # Run the script as follows:
-#       python3 fetch.py [--session <session_file>] <year> <day>
+#       python3 fetch.py [--sample] [--session <session_file>] <year> <day> [-o <output_file>]
 #
 # The following non-standard libraries are required: (requests, beautifulsoup4)
 #       pip install requests beautifulsoup4
 #
 ################################################################################
 
-FULL_INPUT_FORMAT = "input/[[DAY]].txt"
-SAMPLE_INPUT_FORMAT = "input/[[DAY]]s.txt"
-
-################################################################################
-
 from argparse import ArgumentParser
-from bs4 import BeautifulSoup
 from functools import cache
 from pathlib import Path
 import os
+import re
 import requests
 
 @cache
@@ -63,45 +53,40 @@ def get_session(session_file=None):
     print("No session key found anywhere.")
     os.exit(1)
 
-def get_from_format(args, fmt):
-    fmt = fmt.replace("[[DAY]]", str(args.day))
-    fmt = fmt.replace("[[YEAR]]", str(args.year))
-    path = Path(fmt)
-    if path.exists():
-        if args.force:
-            print(f"{fmt} already exists. Overwriting...")
-        else:
-            replace = input(f"{fmt} already exists. Overwrite? [y/N] ")
-            if replace.lower() != "y":
-                return None
-    return path
 
-def get_input_file(args):
-    if (path := get_from_format(args, FULL_INPUT_FORMAT)) is None:
-        return
-
+def get_input(year, day, session_file=None):
     session = requests.Session()
-    session.cookies.set("session", get_session(args.session_file), domain=".adventofcode.com")
+    session.cookies.set("session", get_session(session_file), domain=".adventofcode.com")
 
-    year, day = int(args.year), int(args.day)
     input_url = f"https://adventofcode.com/{year}/day/{day}/input"
     body = session.get(input_url, headers={
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0"
     })
     if body.status_code != 200:
-        print(f"Could not download {input_url}.")
-        print(body)
-        exit(1)
+        print(f"[-] Could not download {input_url}.")
+        return None
 
-    print(f"Saving {path}...")
-    with path.open("w") as fp:
-        fp.write(body.content.decode("utf-8").rstrip())
+    return body.text.rstrip()
 
-def get_sample_file(args):
-    if (path := get_from_format(args, SAMPLE_INPUT_FORMAT)) is None:
-        return
 
-    year, day = int(args.year), int(args.day)
+def get_expected(year, day, session_file=None):
+    session = requests.Session()
+    session.cookies.set("session", get_session(session_file), domain=".adventofcode.com")
+
+    input_url = f"https://adventofcode.com/{year}/day/{day}"
+    body = session.get(input_url, headers={
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0"
+    })
+    if body.status_code != 200:
+        raise Exception(f"Failed to get input for day {day}: {body.status_code}")
+    text = body.text
+    matches = re.findall(r"Your puzzle answer was[^\d-]*-?(\d+)", text)
+    assert len(matches) == 2, f"Expected 2 answers, got {len(matches)}: {matches}"
+    return '\n'.join(matches)
+
+
+def get_sample(year, day, session_file=None):
+    from bs4 import BeautifulSoup
 
     response = requests.get(f"https://adventofcode.com/{year}/day/{day}")
     parser = BeautifulSoup(response.text, 'html.parser')
@@ -119,23 +104,39 @@ def get_sample_file(args):
             break
     
     if sample_text is None:
-        print("Could not find sample input.")
+        print("[-] Could not find sample input.")
         return
 
-    print(f"Saving {path}...")
-    with path.open('w') as fp:
-        fp.write(sample_text.rstrip())
+    return sample_text
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("year", type=str, help="Year of the Advent of Code")
-    parser.add_argument("day", type=str, help="Day of the Advent of Code")
-    parser.add_argument("--session-file", "-s", type=str, help="Custom session file", default=None)
-    parser.add_argument("--force", "-f", action='store_true', help="Force overwrite existing files")
-
+    parser.add_argument("year", type=int, help="Year of the Advent of Code")
+    parser.add_argument("day", type=int, help="Day of the Advent of Code")
+    parser.add_argument("--output", "-o", type=str, default=None, help="Output file", required=False)
+    parser.add_argument("--sample", "-s", action="store_true", help="Fetch sample input instead of full input")
+    parser.add_argument("--expected", "-e", action="store_true", help="Fetch expected output instead of input")
+    parser.add_argument("--session", type=str, help="Custom session file", default=None)
     args = parser.parse_args()
-    os.makedirs("input", exist_ok=True)
 
-    get_input_file(args)
-    get_sample_file(args)
+    assert not (args.sample and args.expected), "Cannot fetch both sample and expected input."
+
+    if args.expected:
+        text = get_expected(args.year, args.day, args.session)
+    elif args.sample:
+        text = get_sample(args.year, args.day, args.session)
+    else:
+        text = get_input(args.year, args.day, args.session)
+
+    if text is None:
+        exit(1)
+    
+    if args.output is None:
+        print(text)
+        exit(0)
+    
+    with open(args.output, "w") as fp:
+        fp.write(text)
+
+    print(f"[+] Wrote input to {args.output}.")
