@@ -1,0 +1,90 @@
+import std::sv::{ SV }
+import std::set::{ Set }
+import .common::{ Grid }
+import std::traits::hash::pair_hash
+
+struct Vec2 {
+    x: i32
+    y: i32
+}
+
+def Vec2::hash(this): u32 => pair_hash(.x.hash(), .y.hash())
+def Vec2::eq(this, other: Vec2): bool => .x == other.x and .y == other.y
+
+struct State {
+    pos: Vec2
+    dir: Vec2
+}
+
+def State::hash(this): u32 => pair_hash(.pos.hash(), .dir.hash())
+def State::eq(this, other: State): bool => .pos.eq(other.pos) and .dir.eq(other.dir)
+
+def trace(grid: &Grid, pos: Vec2, dir: Vec2, seen_pos: &Set<Vec2>, seen_state: &Set<State>) {
+    while 0i32 <= pos.x < grid.width as i32 and 0i32 <= pos.y < grid.height as i32 {
+        let state = State(pos, dir)
+        if seen_state.contains(state) break
+        seen_state.add(state)
+
+        let c = grid.at(pos.x as u32, pos.y as u32)
+        seen_pos.add(pos)
+
+        match c {
+            '.' | '#' => {}
+            '\\' => dir = Vec2(dir.y, dir.x)
+            '/' => dir = Vec2(-dir.y, -dir.x)
+            '|' => {
+                if dir.x != 0 {
+                    trace(grid, Vec2(pos.x, pos.y-1), Vec2(0, -1), seen_pos, seen_state)
+                    trace(grid, Vec2(pos.x, pos.y+1), Vec2(0,  1), seen_pos, seen_state)
+                    return
+                }
+            }
+            '-' => {
+                if dir.y != 0 {
+                    trace(grid, Vec2(pos.x-1, pos.y), Vec2(-1, 0), seen_pos, seen_state)
+                    trace(grid, Vec2(pos.x+1, pos.y), Vec2( 1, 0), seen_pos, seen_state)
+                    return
+                }
+            }
+            else => assert false, `Unexpected char {c}`
+        }
+
+        pos = Vec2(pos.x + dir.x, pos.y + dir.y)
+    }
+}
+
+def num_energized_cells(grid: &Grid, pos: Vec2, dir: Vec2): u64 {
+    let seen_pos = Set<Vec2>::new()
+    let seen_state = Set<State>::new()
+    trace(grid, pos, dir, seen_pos, seen_state)
+    let res = seen_pos.size() as u64
+    seen_pos.free()
+    seen_state.free()
+    return res
+}
+
+def part_one(sv: SV): u64 {
+    let grid = Grid::make(sv)
+    return num_energized_cells(&grid, Vec2(0, 0), Vec2(1, 0))
+}
+
+def part_two(sv: SV): u64 {
+    let grid = Grid::make(sv)
+    let N = grid.width as i32
+
+    let mx = 0u64
+    for let i = 0i32; i < N; i++ {
+        mx = mx.max(num_energized_cells(&grid, Vec2(  i,   0), Vec2( 0,  1)))
+        mx = mx.max(num_energized_cells(&grid, Vec2(  i, N-1), Vec2( 0, -1)))
+        mx = mx.max(num_energized_cells(&grid, Vec2(  0,   i), Vec2( 1,  0)))
+        mx = mx.max(num_energized_cells(&grid, Vec2(N-1,   i), Vec2(-1,  0)))
+    }
+    return mx
+}
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    let sv = SV::from_file(argv[1])
+    println(`Part 1: {part_one(sv)}`)
+    println(`Part 2: {part_two(sv)}`)
+}
