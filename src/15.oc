@@ -19,6 +19,17 @@ struct Hashmap {
     buckets: [&Bucket; 256]
 }
 
+def Hashmap::free(&this) {
+    for let i = 0; i < 256; i++ {
+        let cur = .buckets[i]
+        while cur? {
+            let tmp = cur
+            cur = cur.next
+            std::libc::free(tmp)
+        }
+    }
+}
+
 def Hashmap::add(&this, label: SV, focal: u64) {
     let hash = get_hash(label)
     let cur = &.buckets[hash]

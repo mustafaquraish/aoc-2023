@@ -1,0 +1,491 @@
+
+// global:   renderer: &SDLRenderer
+import std::sdl::{ this, ttf, image, gfx }
+
+let renderer: &sdl::Renderer
+let window: &sdl::Window
+let font: &ttf::Font
+
+
+let WINDOW_WIDTH: i32 = 1024
+let WINDOW_HEIGHT: i32 = 512
+
+let HEIGHT: u32 = 32
+let WIDTH: u32 = 32
+let TILE_SIZE: i32 = 32
+
+def draw_text(text: str, rect: sdl::Rect) {
+    let white = sdl::Color(255, 255, 255, 255)
+    let msg_surf = font.render_solid(text, white)
+    let msg = renderer.create_texture_from_surface(msg_surf)
+    renderer.copy(msg, null, &rect)
+    msg_surf.destroy()
+    msg.destroy()
+}
+
+import std::sv::{ SV }
+import std::set::{ Set }
+import std::vector::{ Vector }
+import .common::Grid
+
+struct Node {
+    x: u32,
+    y: u32,
+    c: char,
+    neighbors: &Vector<&Node>,
+}
+
+def Node::new(x: u32, y: u32, c: char): &Node {
+    let node = std::new<Node>()
+    node.x = x
+    node.y = y
+    node.c = c
+    node.neighbors = Vector<&Node>::new()
+    return node
+}
+
+def Node::free(&this) {
+    .neighbors.free()
+    std::libc::free(this)
+}
+
+// Nodes are uniquely identified by their address in this case, 
+// So the hash and eq functions just use the address as the hash
+def Node::hash(&this): u32 => (this as u64).hash()
+def Node::eq(&this, other: &Node): bool => this == other
+
+def Node::connected_to(&this, x: u32, y: u32): bool {
+    for n : .neighbors.iter() {
+        if n.x == x and n.y == y return true
+    }
+    return false
+}
+
+struct Graph {
+    nodes: &Vector<&Node>
+    start: &Node
+}
+
+def Graph::free(&this) {
+    for n : .nodes.iter() {
+        n.free()
+    }
+    .nodes.free()
+}
+
+def Graph::get(&this, x: u32, y: u32): &Node {
+    if 0 <= y < HEIGHT and 0 <= x < WIDTH {
+        return .nodes.at(y * WIDTH + x)
+    }
+    return null
+}
+
+def Graph::add_neighbour(&this, node: &Node, x: u32, y: u32) {
+    let neighbour = .get(x, y)
+    if neighbour? {
+        node.neighbors.push(neighbour)
+    }
+}
+
+
+def Graph::make(grid: Grid): Graph {
+    let nodes = Vector<&Node>::new()
+    let graph = Graph(nodes, null)
+
+    // Add all nodes to the graph
+    for let y = 0; y < grid.height; y++ {
+        for let x = 0; x < grid.width; x++ {
+            nodes.push(Node::new(x, y, grid.at(x, y)))
+        }
+    }
+
+    // Add in the neighbours
+    for let y = 0; y < grid.height; y++ {
+        for let x = 0; x < grid.width; x++ {
+            let node = graph.get(x, y)
+            match node.c {
+                '|' => {
+                    graph.add_neighbour(node, x, y - 1)
+                    graph.add_neighbour(node, x, y + 1)
+                }
+                '-' => {
+                    graph.add_neighbour(node, x - 1, y)
+                    graph.add_neighbour(node, x + 1, y)
+                }
+                'L' => {
+                    graph.add_neighbour(node, x, y - 1)
+                    graph.add_neighbour(node, x + 1, y)
+                }
+                'J' => {
+                    graph.add_neighbour(node, x, y - 1)
+                    graph.add_neighbour(node, x - 1, y)
+                }
+                '7' => {
+                    graph.add_neighbour(node, x, y + 1)
+                    graph.add_neighbour(node, x - 1, y)
+                }
+                'F' => {
+                    graph.add_neighbour(node, x, y + 1)
+                    graph.add_neighbour(node, x + 1, y)
+                }
+                '.' => {}
+                'S' => {
+                    assert graph.start == null, `Multiple start nodes`
+                    graph.start = node
+                }
+                else => assert false, `Invalid node type: {node.c}`
+            }
+        }
+    }
+    assert graph.start != null, `No start node`
+
+    /// Now, we need to add in the neighbours for the start node
+
+    // For each node around the start one
+    for let dy = -1; dy <= 1; dy++ {
+        for let dx = -1; dx <= 1; dx++ {
+            if dx == 0 and dy == 0 then continue
+
+            // Negative will blow up to out of bounds, so just casting should be OK
+            let x = (graph.start.x as i32 + dx) as u32  
+            let y = (graph.start.y as i32 + dy) as u32
+            let node = graph.get(x, y)
+            if not node? then continue
+
+            if node.connected_to(graph.start.x, graph.start.y) {
+                graph.add_neighbour(graph.start, x, y)
+            }
+        }
+    }
+    return graph
+}
+
+def colu32(r: u32, g: u32, b: u32, a: u32): u32 {
+    return (a << 24) | (b << 16) | (g << 8) | r
+}
+
+let paused: bool = true
+
+def sdl_handle_event() {
+    let e: sdl::Event
+    let quit = false
+
+    while true {
+        while sdl::poll_event(&e) {
+            match e.type {
+                Quit => quit = true
+                KeyDown => {
+                    match e.key.keysym.scancode {
+                        Space => paused = false
+                        Q | Escape => quit = true
+                        else => {}
+                    }
+                }
+                else => {}
+            }
+        }
+        if not paused or quit {
+            break
+        }
+    }
+    if quit {
+        sdl::quit()
+        std::libc::exit(0)
+    }
+}
+
+let graph: Graph
+let cycle: &Set<&Node>
+let internal_nodes: &Set<&Node>
+let external_nodes: &Set<&Node>
+let is_inside_loop: bool
+let is_on_cycle: bool
+let entered_cycle_from_bottom: bool
+let finding_cycle: bool = true
+
+def draw_tile(x: u32, y: u32, cx: u32, cy: u32) {
+    let node = graph.get(x, y)
+    let rect = sdl::Rect(x as i32 * TILE_SIZE, y as i32 * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+    
+    let lo_x = x as i32 * TILE_SIZE
+    let lo_y = y as i32 * TILE_SIZE
+    let mi_x = lo_x + TILE_SIZE / 2
+    let mi_y = lo_y + TILE_SIZE / 2
+    let hi_x = lo_x + TILE_SIZE
+    let hi_y = lo_y + TILE_SIZE
+
+    if not finding_cycle {
+        if x == cx and y == cy {
+            if is_inside_loop {
+                renderer.set_draw_color(0, 255, 0, 255)
+            } else {
+                renderer.set_draw_color(255, 0, 0, 255)
+            }
+            renderer.draw_rect(&rect)
+        }
+    }
+
+    if internal_nodes.contains(node) {
+        // renderer.fill_circle_color(mi_x, mi_y, TILE_SIZE / 4, colu32(0, 255, 0, 255))
+        renderer.set_draw_color(0, 255, 0, 255)
+        renderer.fill_rect(&rect)
+    } else if external_nodes.contains(node) {
+        // renderer.fill_circle_color(mi_x, mi_y, TILE_SIZE / 4, colu32(255, 0, 0, 255))
+        renderer.set_draw_color(255, 0, 0, 255)
+        renderer.fill_rect(&rect)
+    }
+}
+
+def draw_graph(cx: u32, cy: u32) {
+    for let x = 0; x < WIDTH; x++ {
+        for let y = 0; y < HEIGHT; y++ {
+            let node = graph.get(x, y)
+            let rect = sdl::Rect(x as i32 * TILE_SIZE, y as i32 * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            
+            let lo_x = x as i32 * TILE_SIZE
+            let lo_y = y as i32 * TILE_SIZE
+            let mi_x = lo_x + TILE_SIZE / 2
+            let mi_y = lo_y + TILE_SIZE / 2
+            let hi_x = lo_x + TILE_SIZE
+            let hi_y = lo_y + TILE_SIZE
+
+            if finding_cycle {
+                if x == cx and y == cy {
+                    renderer.fill_circle_color(mi_x, mi_y, TILE_SIZE / 4, colu32(255, 255, 255, 255))
+                }
+            }
+            
+            if cycle.contains(node) {
+                renderer.set_draw_color(255, 255, 255, 255)
+            } else {
+                renderer.set_draw_color(80, 80, 80, 255)
+            }
+            for nb : node.neighbors.iter() {
+                if nb.x < x {
+                    renderer.draw_line(lo_x, mi_y, mi_x, mi_y)
+                } else if nb.x > x {
+                    renderer.draw_line(mi_x, mi_y, hi_x, mi_y)
+                }
+                if nb.y < y {
+                    renderer.draw_line(mi_x, lo_y, mi_x, mi_y)
+                } else if nb.y > y {
+                    renderer.draw_line(mi_x, mi_y, mi_x, hi_y)
+                }
+            }
+        }
+    }
+}
+
+def draw_everything_screen(cx: u32, cy: u32) {
+    sdl_handle_event()
+
+    renderer.set_draw_color(0, 0, 0, 255)
+    renderer.clear()
+
+    draw_graph(cx, cy)
+
+    for let x = 0; x < WIDTH; x++ {
+        for let y = 0; y < HEIGHT; y++ {
+            draw_tile(x, y, cx, cy)
+        }
+    }
+
+    renderer.present()
+}
+
+def solve() {
+    let prev = null
+    let cur = graph.start
+
+    // ***** PART 1 *****
+
+    let cycle_len = 0
+    while true {
+        // Pick the neighbour that isn't the previous one
+        let next = cur.neighbors.at(0)
+        if next == prev {
+            next = cur.neighbors.at(1)
+        }
+
+        // Update the previous and current nodes
+        cycle_len++
+        prev = cur
+        cur = next
+
+        // Back at the start node
+        if cur == graph.start {
+            break
+        }
+    }
+
+    prev = null
+    cur = graph.start
+
+    let cycle_fps = 60
+    let render_off = (cycle_len / (cycle_fps)).max(1)
+
+    // Discover the cycle
+    cycle = Set<&Node>::new()
+    internal_nodes = Set<&Node>::new()
+    external_nodes = Set<&Node>::new()
+
+    while true {
+        cycle.add(cur)
+
+        // Pick the neighbour that isn't the previous one
+        let next = cur.neighbors.at(0)
+        if next == prev {
+            next = cur.neighbors.at(1)
+        }
+
+        // Update the previous and current nodes
+        if cycle.size() % render_off == 0 {
+            draw_everything_screen(cur.x, cur.y)
+            sdl::delay((1000 / cycle_fps) as i32)
+        }
+        prev = cur
+        cur = next
+
+
+
+        // Back at the start node
+        if cur == graph.start {
+            break
+        }
+    }
+    finding_cycle = false
+
+
+    println(`Part 1: {cycle.size() / 2}`)
+
+    // ***** PART 2 *****
+
+
+    let total_internal_nodes = 0
+    for let y = 0; y < HEIGHT; y++ {
+        sdl_handle_event()
+
+        renderer.set_draw_color(0, 0, 0, 255)
+        renderer.clear()
+
+        draw_graph(HEIGHT, WIDTH)
+        for let yp = 0; yp < y; yp++ {
+            for let xp = 0; xp < WIDTH; xp++ {
+                draw_tile(xp, yp, 0, y)
+            }
+        }
+
+        let row_internal_nodes = 0
+
+        // Here, we're going to count the number of internal nodes in this row.
+        // We do this by keeping track of whether we're in the "inside" or "outside"
+        // sections of the loop.
+
+        // Inside or outside the loop?
+        is_inside_loop = false
+        // Are we currently on the loop itself?
+        is_on_cycle = false
+        // When we got on the loop, were we entering from the top ('L') or bottom ('F')?
+        entered_cycle_from_bottom = false
+
+        for let x = 0; x < WIDTH; x++ {
+            let node = graph.get(x, y)
+
+            // For any node that's not on the loop itself, and is inside the loop (based on the state), we increment the count.
+            if not cycle.contains(node) {
+                if is_inside_loop {
+                    row_internal_nodes += 1
+                    internal_nodes.add(node)
+                } else {
+                    external_nodes.add(node)
+                }
+
+            // Otherwise, we need to update the state
+            } else {
+                // Case 1: If the node is '|', then we toggle the inside/outside state
+                if node.c == '|' {
+                   is_inside_loop = not is_inside_loop 
+
+                // Case 2: If the node is '-', then inside/outside state stays the same
+                } else if node.c == '-' {
+
+
+                // Case 3: Otherwise
+                // Here, we're either getting on or off the loop. The key idea here is to keep track
+                // of the "directions" from which we get on/off. Specifically, this refers to whether 
+                // the node thatgot us onto the loop was connected to the node above ('L') or below ('F'). 
+                // 
+                // With this, we can make some observations:
+                //    - If we get on/off from the top ('L--J'), the inside/outside state doesn't change
+                //    - If we get on/off from the bottom ('F--7'), the inside/outside state doesn't change
+                //    - If we get on/off from different sides ('L--7' or 'F--J'), this toggles being inside or outside the loop.
+                } else if not is_on_cycle {
+                    entered_cycle_from_bottom = node.connected_to(x, y + 1)
+                    is_on_cycle = true
+                
+                // We're already on a cycle, we must be exitingraph. Swap inside/outside state if we're exiting from the opposite side
+                } else {
+                    let exiting_cycle_from_bottom = node.connected_to(x, y + 1)
+                    if exiting_cycle_from_bottom != entered_cycle_from_bottom {
+                        is_inside_loop = not is_inside_loop
+                    }
+                    is_on_cycle = false
+
+                }
+            }
+            draw_tile(x, y, x, y)
+        }
+        renderer.present()
+        sdl::delay((10000 / HEIGHT) as i32)
+        total_internal_nodes += row_internal_nodes
+    }
+
+    println(`Part 2: {total_internal_nodes}`)
+}
+
+
+
+def main(argc: i32, argv: &str): i32 {
+
+    let sv = SV::from_file(argv[1])
+    let grid = Grid::make(sv)
+    HEIGHT = grid.height
+    WIDTH = grid.width
+    TILE_SIZE = (WINDOW_WIDTH / WIDTH as i32)
+    WINDOW_HEIGHT = TILE_SIZE * HEIGHT as i32
+
+    sdl::init(sdl::INIT_EVERYTHING)
+    sdl::create_window_renderer(WINDOW_WIDTH, WINDOW_HEIGHT, 0, &window, &renderer)
+    sdl::show_cursor(false)
+    sdl::ttf::init()
+    font = ttf::Font::load("./assets/font.ttf", 40)
+
+
+    graph = Graph::make(grid)
+    solve()
+    // graph.free()
+
+    let e: sdl::Event
+    let quit = false
+
+    while not quit {
+        while sdl::poll_event(&e) {
+            match e.type {
+                Quit => quit = true
+                KeyDown => {
+                    match e.key.keysym.scancode {
+                        Q | Escape => quit = true
+                        else => {}
+                    }
+                }
+                else => {}
+            }
+        }
+    }
+
+
+    renderer.destroy()
+    window.destroy()
+    sdl::quit()
+    return 0
+}
