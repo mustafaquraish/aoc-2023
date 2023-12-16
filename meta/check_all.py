@@ -8,7 +8,11 @@ from glob import glob
 YEAR = 2023
 
 def cmd(c):
-    return subprocess.check_output(c, shell=True, text=True)
+    try:
+        return subprocess.check_output(c, shell=True, text=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        print(e.output)
+        raise
 
 
 def run_ocen(file):

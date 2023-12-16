@@ -26,11 +26,21 @@ def is_valid(grid: &Grid, pos: Vec2): bool {
     return true
 }
 
+struct Hit {
+    state: State
+    seen: &Vector<Vec2>
+}
+
+// This is the global cache which stores the next mirror we hit for a given state
+// Only used for states where we are on a '.' cell
+let next_map: &Map<State, Hit>
+
 let seen_pos: &Map<Vec2, bool>
 let seen_state: &Map<State, bool>
 let next: &Vector<State>
 
 def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
+    // Note: Don't clear the cache here, we want to reuse it across calls
     seen_pos.clear()
     seen_state.clear()
     next.clear()
@@ -65,7 +75,34 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
                     continue
                 }
             }
-            else => {}
+            else => {
+                let item = next_map.get_item(st)
+                // We've been here before, no need to loop until the next mirror
+                let hit = if item? {
+                    yield item.value
+
+                // Find the nodes till the next mirror, and cache them
+                } else {
+                    let seen = Vector<Vec2>::new()
+                    while true {
+                        pos = Vec2(pos.x + dir.x, pos.y + dir.y)
+                        if not is_valid(grid, pos) or grid.at(pos.x as u32, pos.y as u32) != '.' {
+                            break
+                        }
+                        seen.push(pos)
+                    }
+                    let next_state = State(pos, dir)
+                    let hit = Hit(next_state, seen)
+                    next_map.insert(st, hit)
+                    yield hit
+                }
+
+                for let i = 0; i < hit.seen.size; i++ {
+                    seen_pos.insert(hit.seen.at(i), true)
+                }
+                next.push(hit.state)
+                continue
+            }
         }
 
         let next_pos = Vec2(pos.x + dir.x, pos.y + dir.y)
@@ -94,6 +131,7 @@ def main(argc: i32, argv: &str) {
     assert argc > 1, `Usage: {argv[0]} <input file>`
     let sv = SV::from_file(argv[1])
 
+    next_map = Map<State, Hit>::new()
     seen_pos = Map<Vec2, bool>::new()
     seen_state = Map<State, bool>::new()
     next = Vector<State>::new()
