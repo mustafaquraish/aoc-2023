@@ -2,6 +2,8 @@
 
 import os
 import re
+import sys
+import contextlib
 import subprocess
 import shutil
 import textwrap
@@ -10,10 +12,43 @@ from time import perf_counter
 
 YEAR = 2023
 
+@contextlib.contextmanager
+def pushd(new_dir):
+    previous_dir = os.getcwd()
+    os.chdir(new_dir)
+    try:
+        yield
+    finally:
+        os.chdir(previous_dir)
+
 def cmd(c):
     return subprocess.check_output(c, shell=True, text=True)
 
 os.makedirs("build", exist_ok=True)
+
+def compile_benchmark():
+    # Profile guided optimization
+    if sys.platform == "linux":
+        print("[+] Compiling with instrumentation")
+        cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-generate'")
+        print("[+] Running benchmark")
+        cmd("./run_all ./")
+        print("[+] Compiling with profile")
+        cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-use'")
+    elif sys.platform == "darwin":
+        print("[+] Compiling with instrumentation")
+        cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-generate'")
+        print("[+] Running benchmark")
+        cmd("./run_all ./")
+        # use llvm-profdata to merge the profiles
+        print("[+] Merging profiles with llvm-profdata")
+        cmd("xcrun llvm-profdata merge -output=default.profdata *.profraw")
+        print("[+] Compiling with profile")
+        cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-use=default.profdata'")
+    else:
+        print("[+] Compiling ")
+        cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result'")
+
 
 def create_benchmark(days):
     # Download input
@@ -49,8 +84,8 @@ def create_benchmark(days):
 
         fp.write("}\n")
 
-    print("[+] Compiling build/src/run_all.oc")
-    cmd("ocen build/src/run_all.oc -o build/run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result'")
+    with pushd("build"):
+        compile_benchmark()
 
 
 def run_benchmark():
@@ -66,7 +101,7 @@ def run_benchmark():
     avg = sum(times) / len(times)
     print()
 
-    print(f"[+] Estimated time: {avg:.3f}s")
+    print(f"[+] Average time for all {len(days)} days: {avg:.3f}s")
 
 files = sorted(glob("src/??.oc"))
 days = [int(re.search(r"(\d+)", f).group(1)) for f in files]

@@ -4,6 +4,7 @@ POSITIONAL_ARGS=()
 while [[ $# -gt 0 ]]; do
   case $1 in
     -f|--fast) FAST=1; shift;;
+    -p|--pgo) PGO=1; shift;;
     *) POSITIONAL_ARGS+=("$1"); shift;;
   esac
 done
@@ -31,6 +32,20 @@ set -e
 
 if [[ $FAST -eq 1 ]]; then
     ocen -d -cf "-O3 -march=native -funroll-loops" -o $OUT $SRC
+elif [[ $PGO -eq 1 ]]; then
+    # if macos, use `llvm-profdata merge -output=profdata.profdata *.profraw`
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        ocen -cf "-O3 -march=native -funroll-loops -fprofile-generate" -o $OUT $SRC
+        $OUT $ARGS > /dev/null
+        xcrun llvm-profdata merge -output=build/default.profdata *.profraw
+        ocen -d -cf "-O3 -march=native -funroll-loops -fprofile-use=build/default.profdata" -o $OUT $SRC
+
+    # Assume linux with gcc
+    else
+        ocen -cf "-O3 -march=native -funroll-loops -fprofile-generate" -o $OUT $SRC
+        $OUT $ARGS > /dev/null
+        ocen -d -cf "-O3 -march=native -funroll-loops -fprofile-use" -o $OUT $SRC
+    fi
 else
     ocen -d $SRC -o $OUT
 fi
