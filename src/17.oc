@@ -1,0 +1,148 @@
+import std::sv::{ SV }
+// import std::libc::*
+// import std::vec::{ Vec }
+import std::map::{ Map }
+import std::heap::{ Heap }
+// import std::vector::{ Vector }
+import std::traits::compare
+import std::traits::hash::pair_hash
+import .common::{ Grid }
+
+struct Vec2 {
+    x: i32
+    y: i32
+}
+
+def Vec2::hash(this): u32 => pair_hash(.x.hash(), .y.hash())
+def Vec2::eq(this, other: Vec2): bool => .x == other.x and .y == other.y
+
+struct State {
+    cost: u64
+    dir_count: u32
+    point: Vec2
+    dir: Vec2 
+}
+
+// For the heap
+def State::compare(this, other: State): i8 => .cost.compare(other.cost)
+
+
+// Maps can be slow here, so we use a perfect hash table that can map
+// Each state to a unique index in an array. Rounding up, we have:
+//    - 8 directions   (Actually only the 4 cardinals, but we use 8 for faster hashing)
+//    - 16 dir counts  (Actually 0..10 inclusive, but we use 16 for faster hashing)
+//    - N^2 points     (~20K for N=141)
+// For a total of ~2.6M states, taking ~21MB of memory with 64-bit integers.
+struct Cache {
+    d_max: u64
+    p_max: u64
+    c_max: u64
+    grid_size: u64
+
+    size: u64
+    data: &u64
+}
+
+def Cache::make(N: u32): Cache {
+    let cache: Cache
+    cache.d_max = 8u64
+    cache.c_max = 16u64
+    cache.p_max = N as u64 * N as u64
+    cache.grid_size = N as u64
+    cache.size = cache.d_max * cache.p_max * cache.c_max
+    cache.data = std::new<u64>(cache.size as u32)
+    return cache
+}
+
+
+// Perfect hash function for the state
+def Cache::hash(&this, s: State): u64 {
+    let d_hash = ((s.dir.x * 3) + 3 + s.dir.y) as u64    
+    let p_hash = s.point.x as u64 + s.point.y as u64 * .grid_size
+    let c_hash = s.dir_count as u64
+    return c_hash + .c_max * (d_hash + .d_max * p_hash)
+}
+
+def Cache::get(&this, state: State): u64 => .data[.hash(state)]
+def Cache::set(&this, state: State, value: u64) {
+    .data[.hash(state)] = value
+}
+
+def Cache::reset(&this) {
+    std::libc::memset(.data, -1, .size as u32 * sizeof(u64))
+}
+
+def add_start_node(heap: &Heap<State>, costs: &Cache, start: Vec2, dir: Vec2) {
+    let state = State(0, 0, start, dir)
+    heap.push(state)
+    costs.set(state, 0)
+}
+
+def solve(costs: &Cache, grid: Grid, ultra: bool): u64 {
+    let N = grid.width as i32
+    let start = Vec2(0, 0)
+    let end = Vec2(N-1, N-1)
+
+    let upper_limit = if ultra then 10 else 3
+    let lower_limit = if ultra then 4 else 0
+
+    let heap = Heap<State>::new(Min, capacity: 8192)
+    costs.reset()
+
+    add_start_node(heap, costs, start, Vec2(1, 0))
+    add_start_node(heap, costs, start, Vec2(0, 1))
+
+    let result = 0u64
+    while not heap.is_empty() {
+        let cur = heap.unchecked_pop()
+
+        if cur.point.eq(end) {
+            result = cur.cost
+            break
+        }
+
+        let offsets: [Vec2; 3]
+        let count = 0
+        
+        if cur.dir_count < upper_limit then offsets[count++] = cur.dir
+        if cur.dir_count >= lower_limit {
+            offsets[count++] = Vec2(-cur.dir.y,  cur.dir.x)
+            offsets[count++] = Vec2( cur.dir.y, -cur.dir.x)
+        }
+
+        for let i = 0; i < count; i++ {
+            let off = offsets[i]
+
+            let new = Vec2(cur.point.x + off.x, cur.point.y + off.y)
+            if new.x < 0 or new.x >= grid.width as i32 then continue
+            if new.y < 0 or new.y >= grid.height as i32 then continue
+
+            let c = grid.at(new.x as u32, new.y as u32).get_digit() as u64
+            let new_cost = cur.cost + c
+
+            let new_dir_count = if cur.dir.eq(off) then cur.dir_count + 1 else 1
+            let new_state = State(new_cost, new_dir_count, new, off)
+
+            let cost_idx = costs.hash(new_state)
+            if costs.data[cost_idx] == 0 or costs.data[cost_idx] <= new_cost then continue
+            costs.data[cost_idx] = new_cost
+
+            heap.push(new_state)
+        }
+    }
+
+    heap.free()
+    return result
+}
+
+
+def main(argc: i32, argv: &str) {
+    assert argc > 1, `Usage: {argv[0]} <input file>`
+    let sv = SV::from_file(argv[1])
+    let grid = Grid::make(sv)
+
+    let cache = Cache::make(grid.width)
+
+    println(`Part 1: {solve(&cache, grid, false)}`)
+    println(`Part 2: {solve(&cache, grid, true)}`)
+}
