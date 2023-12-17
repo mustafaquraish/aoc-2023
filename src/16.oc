@@ -31,12 +31,51 @@ struct Hit {
     seen: &Vector<Vec2>
 }
 
+struct Cache<T> {
+    p_max: u32
+    d_max: u32
+    grid_size: u32
+
+    size: u32
+    data: &T
+}
+
+def Cache::make(N: u32): Cache<T> {
+    let cache: Cache<T>
+    cache.p_max = N as u32 * N as u32
+    cache.d_max = 8u32 // For faster hashing
+    cache.grid_size = N as u32
+    cache.size = cache.d_max * cache.p_max
+    cache.data = std::new<T>(cache.size as u32)
+    return cache
+}
+
+// Perfect hash function for the state
+def Cache::hash_state(&this, s: State): u32 {
+    let d_hash = ((s.dir.x * 3) + 3 + s.dir.y) as u32
+    let p_hash = s.pos.x as u32 + s.pos.y as u32 * .grid_size
+    return p_hash + .p_max * d_hash
+}
+
+def Cache::hash_vec(&this, v: Vec2): u32 => v.x as u32 + v.y as u32 * .grid_size
+
+def Cache::get_state(&this, state: State): T => .data[.hash_state(state)]
+def Cache::set_state(&this, state: State, value: T) => .data[.hash_state(state)] = value
+
+def Cache::get_vec(&this, v: Vec2): T => .data[.hash_vec(v)]
+def Cache::set_vec(&this, v: Vec2, value: T) => .data[.hash_vec(v)] = value
+
+def Cache::clear(&this) {
+    std::libc::memset(.data, 0, .size as u32 * sizeof(T))
+}
+
+
 // This is the global cache which stores the next mirror we hit for a given state
 // Only used for states where we are on a '.' cell
-let next_map: &Map<State, Hit>
+let next_map: Cache<Hit>
 
-let seen_pos: &Map<Vec2, bool>
-let seen_state: &Map<State, bool>
+let seen_pos: Cache<bool>
+let seen_state: Cache<bool>
 let next: &Vector<State>
 
 def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
@@ -53,9 +92,11 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
 
         if not is_valid(grid, pos) then continue
 
-        if seen_state.contains(st) continue
-        seen_state.insert(st, true)
-        seen_pos.insert(pos, true)
+        let seen_state_idx = seen_state.hash_state(st)
+        if seen_state.data[seen_state_idx] then continue
+        seen_state.data[seen_state_idx] = true
+
+        seen_pos.set_vec(pos, true)
 
         let c = grid.at(pos.x as u32, pos.y as u32)
         match c {
@@ -76,13 +117,10 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
                 }
             }
             else => {
-                let item = next_map.get_item(st)
-                // We've been here before, no need to loop until the next mirror
-                let hit = if item? {
-                    yield item.value
+                let hit = next_map.get_state(st)
 
                 // Find the nodes till the next mirror, and cache them
-                } else {
+                if not hit.seen? {
                     let seen = Vector<Vec2>::new()
                     while true {
                         pos = Vec2(pos.x + dir.x, pos.y + dir.y)
@@ -92,13 +130,12 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
                         seen.push(pos)
                     }
                     let next_state = State(pos, dir)
-                    let hit = Hit(next_state, seen)
-                    next_map.insert(st, hit)
-                    yield hit
+                    hit = Hit(next_state, seen)
+                    next_map.set_state(st, hit)
                 }
 
                 for let i = 0; i < hit.seen.size; i++ {
-                    seen_pos.insert(hit.seen.at(i), true)
+                    seen_pos.set_vec(hit.seen.data[i], true)
                 }
                 next.push(hit.state)
                 continue
@@ -109,7 +146,12 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
         next.push(State(next_pos, dir))
     }
 
-    return seen_pos.size() as u64
+    let total = 0u64
+    for let i = 0; i < seen_pos.p_max; i++ {
+        total += seen_pos.data[i] as u64
+    }
+
+    return total
 }
 
 def part_one(grid: &Grid): u64 => num_energized_cells(grid, Vec2(0, 0), Vec2(1, 0))
@@ -130,13 +172,12 @@ def part_two(grid: &Grid): u64 {
 def main(argc: i32, argv: &str) {
     assert argc > 1, `Usage: {argv[0]} <input file>`
     let sv = SV::from_file(argv[1])
-
-    next_map = Map<State, Hit>::new(capacity: 4096)
-    seen_pos = Map<Vec2, bool>::new(capacity: 4096)
-    seen_state = Map<State, bool>::new(capacity: 4096)
-    next = Vector<State>::new(capacity: 4096)
-
     let grid = Grid::make(sv)
+
+    next_map = Cache<Hit>::make(grid.width as u32)
+    seen_pos = Cache<bool>::make(grid.width as u32)
+    seen_state = Cache<bool>::make(grid.width as u32)
+    next = Vector<State>::new(capacity: 4096)
 
     println(`Part 1: {part_one(&grid)}`)
     println(`Part 2: {part_two(&grid)}`)
