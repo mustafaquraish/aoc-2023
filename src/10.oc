@@ -1,5 +1,5 @@
 import std::sv::{ SV }
-import std::set::{ Set }
+import std::compact_map::{ Map }
 import std::vector::{ Vector }
 import .common::Grid
 
@@ -50,7 +50,7 @@ def Graph::free(&this) {
     .nodes.free()
 }
 
-def Graph::draw(&this, cycle: &Set<&Node>) {
+def Graph::draw(&this, cycle: &Map<&Node, bool>) {
     for let y = 0; y < .height; y++ {
         for let x = 0; x < .width; x++ {
             let node = .get(x, y)
@@ -171,9 +171,9 @@ def solve(g: Graph) {
     // ***** PART 1 *****
 
     // Discover the cycle
-    let cycle = Set<&Node>::new()
+    let cycle = Map<&Node, bool>::new()
     while true {
-        cycle.add(cur)
+        cycle.insert(cur, true)
 
         // Pick the neighbour that isn't the previous one
         let next = cur.neighbors.at(0)
@@ -191,7 +191,7 @@ def solve(g: Graph) {
         }
     }
 
-    g.draw(cycle)
+    // g.draw(cycle)
 
     println(`Part 1: {cycle.size() / 2}`)
 

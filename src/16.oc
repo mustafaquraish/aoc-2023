@@ -47,7 +47,7 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
 
     next.push(State(start_pos, start_dir))
     while next.size > 0 {
-        let st = next.pop()
+        let st = next.unchecked_pop()
         let pos = st.pos
         let dir = st.dir
 
