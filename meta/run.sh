@@ -30,7 +30,7 @@ fi
 set -e
 
 if [[ $FAST -eq 1 ]]; then
-    ocen -cf "-O3 -march=native -funroll-loops" -o $OUT $SRC
+    ocen -d -cf "-O3 -march=native -funroll-loops" -o $OUT $SRC
 else
     ocen -d $SRC -o $OUT
 fi

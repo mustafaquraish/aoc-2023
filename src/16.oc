@@ -131,10 +131,10 @@ def main(argc: i32, argv: &str) {
     assert argc > 1, `Usage: {argv[0]} <input file>`
     let sv = SV::from_file(argv[1])
 
-    next_map = Map<State, Hit>::new()
-    seen_pos = Map<Vec2, bool>::new()
-    seen_state = Map<State, bool>::new()
-    next = Vector<State>::new()
+    next_map = Map<State, Hit>::new(capacity: 4096)
+    seen_pos = Map<Vec2, bool>::new(capacity: 4096)
+    seen_state = Map<State, bool>::new(capacity: 4096)
+    next = Vector<State>::new(capacity: 4096)
 
     let grid = Grid::make(sv)
 
