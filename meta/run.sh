@@ -1,5 +1,16 @@
 #!/bin/bash
 
+POSITIONAL_ARGS=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -f|--fast) FAST=1; shift;;
+    *) POSITIONAL_ARGS+=("$1"); shift;;
+  esac
+done
+set -- "${POSITIONAL_ARGS[@]}" # restore positional parameters
+
+#################################
+
 DAY=$(printf "%02d" "${1#0}")
 shift
 
@@ -18,8 +29,10 @@ fi
 
 set -e
 
-ocen -d $SRC -o $OUT
+if [[ $FAST -eq 1 ]]; then
+    ocen -cf "-O3 -march=native -funroll-loops" -o $OUT $SRC
+else
+    ocen -d $SRC -o $OUT
+fi
 
-set -x
-
-$OUT $ARGS
+zsh -c "time $OUT $ARGS"
