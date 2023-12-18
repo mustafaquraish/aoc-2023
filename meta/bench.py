@@ -29,13 +29,14 @@ os.makedirs("build", exist_ok=True)
 
 def compile_benchmark():
     # Profile guided optimization
-    if sys.platform == "linux":
+    if sys.platform == "linux" or "gcc" in os.getenv("CC", "clang"):
         print("[+] Compiling with instrumentation")
         cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-generate'")
         print("[+] Running benchmark")
         cmd("./run_all ./ 2")
         print("[+] Compiling with profile")
         cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-use'")
+        cmd("rm -f *.gcda")
     elif sys.platform == "darwin":
         print("[+] Compiling with instrumentation")
         cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-generate'")
@@ -46,6 +47,7 @@ def compile_benchmark():
         cmd("xcrun llvm-profdata merge -output=default.profdata *.profraw")
         print("[+] Compiling with profile")
         cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result -fprofile-use=default.profdata'")
+        cmd("rm -f *.profraw *.profdata")
     else:
         print("[+] Compiling ")
         cmd("ocen src/run_all.oc -o ./run_all -cf '-O3 -march=native -funroll-loops -Wno-unused-result'")
@@ -81,6 +83,9 @@ def create_benchmark(days):
             let argv: [str; 2]
             argv[0] = "dummy"
             argv[1] = inp
+
+            f(2, argv)  // warmup
+
             let total = 0.0
             for let i = 0; i < RUNS; i++ {                  
                 let start = ftime()
