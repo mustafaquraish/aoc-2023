@@ -17,9 +17,6 @@ struct State {
     dir: Vec2
 }
 
-def State::hash(this): u32 => pair_hash(.pos.hash(), .dir.hash())
-def State::eq(this, other: State): bool => .pos.eq(other.pos) and .dir.eq(other.dir)
-
 def is_valid(grid: &Grid, pos: Vec2): bool {
     if pos.x < 0 or pos.x >= grid.width as i32 then return false
     if pos.y < 0 or pos.y >= grid.height as i32 then return false
@@ -28,7 +25,7 @@ def is_valid(grid: &Grid, pos: Vec2): bool {
 
 struct Hit {
     state: State
-    seen: &Vector<Vec2>
+    seen: &Vector<u32>
 }
 
 struct Cache<T> {
@@ -121,13 +118,13 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
 
                 // Find the nodes till the next mirror, and cache them
                 if not hit.seen? {
-                    let seen = Vector<Vec2>::new()
+                    let seen = Vector<u32>::new()
                     while true {
                         pos = Vec2(pos.x + dir.x, pos.y + dir.y)
                         if not is_valid(grid, pos) or grid.at(pos.x as u32, pos.y as u32) != '.' {
                             break
                         }
-                        seen.push(pos)
+                        seen.push(seen_pos.hash_vec(pos))
                     }
                     let next_state = State(pos, dir)
                     hit = Hit(next_state, seen)
@@ -135,7 +132,7 @@ def num_energized_cells(grid: &Grid, start_pos: Vec2, start_dir: Vec2): u64 {
                 }
 
                 for let i = 0; i < hit.seen.size; i++ {
-                    seen_pos.set_vec(hit.seen.data[i], true)
+                    seen_pos.data[hit.seen.data[i]] = true
                 }
                 next.push(hit.state)
                 continue
