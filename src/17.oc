@@ -1,11 +1,5 @@
 import std::sv::{ SV }
-// import std::libc::*
-// import std::vec::{ Vec }
-import std::map::{ Map }
 import std::heap::{ Heap }
-// import std::vector::{ Vector }
-import std::traits::compare
-import std::traits::hash::pair_hash
 import .common::{ Grid }
 
 struct Vec2 {
@@ -13,24 +7,23 @@ struct Vec2 {
     y: i32
 }
 
-def Vec2::hash(this): u32 => pair_hash(.x.hash(), .y.hash())
 def Vec2::eq(this, other: Vec2): bool => .x == other.x and .y == other.y
 
 struct State {
-    point: Vec2
-    dir: Vec2 
+    pos: Vec2
+    dir: Vec2
     cost: u32
 }
 
 // For the heap
-def State::compare(this, other: State): i8 => .cost.compare(other.cost)
+def State::compare(this, other: State): i8 => (.cost - other.cost) as i8
 
 
 // Maps can be slow here, so we use a perfect hash table that can map
 // Each state to a unique index in an array. Rounding up, we have:
-//    - 8 directions   (Actually only the 4 cardinals, but we use 8 for faster hashing)
+//    - 2 directions   (Only horizontal/vertical matters for the problem)
 //    - N^2 points     (~20K for N=141)
-// For a total of ~160K states, taking <1MB of memory with 32-bit integers.
+// For a total of ~40K states, taking <0.2MB of memory with 32-bit integers.
 struct Cache {
     d_max: u32
     p_max: u32
@@ -42,7 +35,7 @@ struct Cache {
 
 def Cache::make(N: u32): Cache {
     let cache: Cache
-    cache.d_max = 8u32
+    cache.d_max = 2u32
     cache.p_max = N as u32 * N as u32
     cache.grid_size = N as u32
     cache.size = cache.d_max * cache.p_max
@@ -53,8 +46,9 @@ def Cache::make(N: u32): Cache {
 
 // Perfect hash function for the state
 def Cache::hash(&this, s: State): u32 {
-    let d_hash = ((s.dir.x * 3) + 3 + s.dir.y) as u32
-    let p_hash = s.point.x as u32 + s.point.y as u32 * .grid_size
+    // It doesn't matter if we're going left/right or up/down, only the axis.
+    let d_hash = (s.dir.x == 0) as u32
+    let p_hash = s.pos.x as u32 + s.pos.y as u32 * .grid_size
     return d_hash + .d_max * p_hash
 }
 
@@ -87,7 +81,7 @@ def solve(costs: &Cache, grid: Grid, ultra: bool): u32 {
     while not heap.is_empty() {
         let cur = heap.unchecked_pop()
 
-        if cur.point.eq(end) {
+        if cur.pos.eq(end) {
             result = cur.cost
             break
         }
@@ -101,7 +95,7 @@ def solve(costs: &Cache, grid: Grid, ultra: bool): u32 {
         for let i = 0; i < count; i++ {
             let off = offsets[i]
 
-            let new_pos = cur.point
+            let new_pos = cur.pos
             let new_cost = cur.cost
 
             for let j = 1; j < upper_limit + 1; j++ {
