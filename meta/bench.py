@@ -71,6 +71,7 @@ def create_benchmark(days):
         prelude = textwrap.dedent("""
         import std::vector::{ Vector }
         import std::buffer::{ Buffer }
+        import std::fs
                               
         @compiler c_include "time.h"
         def clock(): i64 extern
@@ -120,15 +121,13 @@ def create_benchmark(days):
             for let i = 0; i < times.size; i++ {
                 let t = times.at(i)
                 total += t
-                buf.putsf(`    "{i+1:02d}": {t:.3f},\\n`)                        
+                buf.putsf(`    "{i+1:02d}": {t:.3f},\\n`)
             }
             buf.putsf(`    "total": {total:.3f}\\n`)
             buf.puts("}\\n")
 
-            let file = std::File::open("benchmark.json", "w")
-            file.write(buf.data, buf.size)
-            file.close()
-        }                         
+            fs::write_file("benchmark.json", buf)
+        }
         """))
 
     with pushd("build"):

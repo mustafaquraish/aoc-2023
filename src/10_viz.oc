@@ -1,6 +1,7 @@
 
 // global:   renderer: &SDLRenderer
 import std::sdl::{ this, ttf, image, gfx }
+import std::fs
 
 let renderer: &sdl::Renderer
 let window: &sdl::Window
@@ -447,7 +448,7 @@ def solve() {
 
 def main(argc: i32, argv: &str): i32 {
 
-    let sv = SV::from_file(argv[1])
+    let sv = fs::read_file(argv[1]).sv()
     let grid = Grid::make(sv)
     HEIGHT = grid.height
     WIDTH = grid.width

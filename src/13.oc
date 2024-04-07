@@ -1,5 +1,6 @@
 import std::sv::{ SV }
 import .common::{ Grid }
+import std::fs
 
 enum Axis { X, Y }
 
@@ -58,5 +59,5 @@ def solve(sv: SV) {
 
 def main(argc: i32, argv: &str) {
     assert argc > 1, `Usage: {argv[0]} <input file>`
-    solve(SV::from_file(argv[1]))
+    solve(fs::read_file(argv[1]).sv())
 }
