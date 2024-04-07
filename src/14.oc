@@ -81,9 +81,9 @@ def grid_to_string(grid: &Grid): SV {
     let buf = Buffer::make(capacity: N)
     for let row = 0; row < grid.height; row++ {
         for let col = 0; col < grid.width; col++ {
-            buf.putc(grid.at(col, row))
+            buf += grid.at(col, row)
         }
-        buf.putc('|')
+        buf += '|'
     }
     return buf.sv()
 }

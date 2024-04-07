@@ -72,9 +72,9 @@ def part_two(sv: SV): u64 {
 
         for let i = 0; i < 5; i++ {
             if i > 0 {
-                buf.putc('?')
+                buf += '?'
             }
-            buf.putsv(L)
+            buf += L
             N2.extend(N)
         }
 

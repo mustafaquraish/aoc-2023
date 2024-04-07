@@ -340,7 +340,7 @@ def solve() {
         }
 
         // Update the previous and current nodes
-        if cycle.size() % render_off == 0 {
+        if cycle.size % render_off == 0 {
             draw_everything_screen(cur.x, cur.y)
             sdl::delay((1000 / cycle_fps) as i32)
         }
@@ -357,7 +357,7 @@ def solve() {
     finding_cycle = false
 
 
-    println(`Part 1: {cycle.size() / 2}`)
+    println(`Part 1: {cycle.size / 2}`)
 
     // ***** PART 2 *****
 
