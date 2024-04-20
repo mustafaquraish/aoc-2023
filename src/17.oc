@@ -1,6 +1,7 @@
 import std::sv::{ SV }
 import std::heap::{ Heap }
 import .common::{ Grid }
+import std::mem
 import std::fs
 
 struct Vec2 {
@@ -40,7 +41,7 @@ def Cache::make(N: u32): Cache {
     cache.p_max = N as u32 * N as u32
     cache.grid_size = N as u32
     cache.size = cache.d_max * cache.p_max
-    cache.data = std::new<u32>(cache.size as u32)
+    cache.data = mem::alloc<u32>(cache.size as u32)
     return cache
 }
 

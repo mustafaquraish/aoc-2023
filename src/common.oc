@@ -1,6 +1,7 @@
 import std::vector::{ Vector }
 import std::sv::{ SV }
 import std::traits::hash::{ pair_hash }
+import std::mem
 
 struct Point {
     x: u64
@@ -19,7 +20,7 @@ struct Grid {
 def Grid::empty(width: u32, height: u32, c: char = '.'): Grid {
     let lines = Vector<str>::new()
     for let i =  0; i < height; i++ {
-        let s = std::new<char>(width + 1)
+        let s = mem::alloc<char>(width + 1)
         for let j = 0; j < width; j++ {
             s[j] = c
         }
@@ -32,9 +33,9 @@ def Grid::make(sv: SV): Grid {
     let lines = Vector<str>::new()
     let width = 0
     for line : sv.lines() {
-        let mem = std::new<char>(line.len + 1)
-        std::libc::memcpy(mem, line.data, line.len)
-        lines.push(mem)
+        let m = mem::alloc<char>(line.len + 1)
+        std::libc::memcpy(m, line.data, line.len)
+        lines.push(m)
         width = line.len
     }
     let height = lines.size

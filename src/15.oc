@@ -1,5 +1,6 @@
 import std::sv::{ SV }
 import std::fs
+import std::mem
 
 def get_hash(sv: SV): u64 {
     let t = 0u8
@@ -42,7 +43,7 @@ def Hashmap::add(&this, label: SV, focal: u64) {
         }
         cur = &(*cur).next
     }
-    let new = std::new<Bucket>()
+    let new = mem::alloc<Bucket>()
     new.label = label
     new.focal = focal
     new.next = *cur

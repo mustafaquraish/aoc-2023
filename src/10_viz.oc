@@ -37,7 +37,7 @@ struct Node {
 }
 
 def Node::new(x: u32, y: u32, c: char): &Node {
-    let node = std::new<Node>()
+    let node = mem::alloc<Node>()
     node.x = x
     node.y = y
     node.c = c

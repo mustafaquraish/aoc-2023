@@ -3,6 +3,7 @@ import std::compact_map::{ Map }
 import std::vector::{ Vector }
 import .common::Grid
 import std::fs
+import std::mem
 
 struct Node {
     x: u32,
@@ -12,7 +13,7 @@ struct Node {
 }
 
 def Node::new(x: u32, y: u32, c: char): &Node {
-    let node = std::new<Node>()
+    let node = mem::alloc<Node>()
     node.x = x
     node.y = y
     node.c = c

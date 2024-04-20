@@ -3,6 +3,7 @@ import std::compact_map::{ Map }
 import std::vector::{ Vector }
 import .common::{ Grid }
 import std::traits::hash::pair_hash
+import std::mem
 import std::fs
 
 struct Vec2 {
@@ -44,7 +45,7 @@ def Cache::make(N: u32): Cache<T> {
     cache.d_max = 8u32 // For faster hashing
     cache.grid_size = N as u32
     cache.size = cache.d_max * cache.p_max
-    cache.data = std::new<T>(cache.size as u32)
+    cache.data = mem::alloc<T>(cache.size as u32)
     return cache
 }
 
